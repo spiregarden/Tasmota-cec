@@ -26,6 +26,9 @@ on:
       - 'tasmota/include/tasmota_template_legacy.h'
       - '.github/workflows/build_slwf08_hdmi_cec.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build-slwf08:
     runs-on: ubuntu-latest
