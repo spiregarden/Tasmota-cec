@@ -12,7 +12,6 @@ jobs:
 
   copy_change:
     runs-on: ubuntu-latest
-    if: github.repository == 'arendst/Tasmota'
     steps:
     - uses: actions/checkout@v4
     - name: Push I2CDevices.md to https://github.com/Tasmota/docs

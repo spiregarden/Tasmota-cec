@@ -20,7 +20,6 @@ on:
 jobs:
   os-check-win:
     runs-on: windows-latest
-    if: github.repository == 'arendst/Tasmota'
     strategy:
       fail-fast: true
       matrix:
@@ -52,7 +51,6 @@ jobs:
 
   os-check-mac:
     runs-on: macos-14
-    if: github.repository == 'arendst/Tasmota'
     strategy:
       fail-fast: true
       matrix:
@@ -84,7 +82,6 @@ jobs:
 
   base-images:
     runs-on: ubuntu-latest
-    if: github.repository == 'arendst/Tasmota'
     strategy:
       fail-fast: true
       matrix:
@@ -138,7 +135,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv pip install --system platformio
-          cp ./platformio_override_sample.ini ./platformio_override.ini
+          if [ ! -f ./platformio_override.ini ]; then cp ./platformio_override_sample.ini ./platformio_override.ini; fi
       - name: Run PlatformIO
         env:
           PYTHONIOENCODING: utf-8
@@ -151,7 +148,6 @@ jobs:
 
   language-images:
     runs-on: ubuntu-latest
-    if: github.repository == 'arendst/Tasmota'
     strategy:
       fail-fast: true
       matrix:
