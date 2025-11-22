@@ -19,6 +19,9 @@
 
 
 #ifdef USE_HDMI_CEC
+#ifndef USE_I2C
+#include <Wire.h>
+#endif
 /*********************************************************************************************\
  * HDMI CEC send and receive using lib https://github.com/lucadentella/ArduinoLib_CEClient
 \*********************************************************************************************/
@@ -33,6 +36,60 @@ void (* const HDMICommand[])(void) PROGMEM = {
   &CmndHDMISendRaw, CmndHDMISend,
   &CmndHDMIType, &CmndHDMIAddr,
   };
+
+// HDMI-CEC needs access to the DDC (I2C) channel even if the global USE_I2C option is disabled.
+#if defined(USE_I2C)
+static inline bool HdmiCecEnsureI2cReady(void) {
+  return TasmotaGlobal.i2c_enabled[0];
+}
+
+static inline bool HdmiCecReadBuffer(uint8_t addr, int reg, uint8_t *reg_data, uint16_t len) {
+  return I2cReadBuffer(addr, reg, reg_data, len);
+}
+#else
+static bool hdmi_cec_i2c_initialized = false;
+
+static bool HdmiCecEnsureI2cReady(void) {
+  if (!hdmi_cec_i2c_initialized) {
+    int32_t sda = Pin(GPIO_I2C_SDA);
+    int32_t scl = Pin(GPIO_I2C_SCL);
+    if (sda >= 0 && scl >= 0) {
+      Wire.begin(sda, scl);
+    } else {
+      Wire.begin();
+    }
+    Wire.setClock(100000);
+    hdmi_cec_i2c_initialized = true;
+  }
+  return true;
+}
+
+static bool HdmiCecReadBuffer(uint8_t addr, int reg, uint8_t *reg_data, uint16_t len) {
+  if (!HdmiCecEnsureI2cReady()) { return true; }
+
+  Wire.beginTransmission((uint8_t)addr);
+  if (reg > -1) {
+    Wire.write((uint8_t)reg);
+    if (reg > 255) {
+      Wire.write((uint8_t)(reg >> 8));
+    }
+    if (Wire.endTransmission() != 0) {
+      return true;
+    }
+  }
+
+  if (Wire.requestFrom((uint8_t)addr, (uint8_t)len) != len) {
+    return true;
+  }
+  while (len--) {
+    *reg_data++ = (uint8_t)Wire.read();
+  }
+  if (reg < 0) {
+    Wire.endTransmission();
+  }
+  return false;
+}
+#endif
 
 
 // This is called after the logical address has been allocated
@@ -236,10 +293,10 @@ void CmndHDMIType(void) {
 // The buffer must be allocated to uint8_t[256] by caller
 // Only checksum is checked
 bool ReadEdid256(uint8_t *buf) {
-  if (!TasmotaGlobal.i2c_enabled[0]) { return true; }    // abort if I2C is not started
+  if (!HdmiCecEnsureI2cReady()) { return true; }    // abort if I2C is not started
 
-  if (I2cReadBuffer(HDMI_EDID_ADDRESS,   0, buf      , 128)) { return true; }
-  if (I2cReadBuffer(HDMI_EDID_ADDRESS, 128, buf + 128, 128)) { return true; }
+  if (HdmiCecReadBuffer(HDMI_EDID_ADDRESS,   0, buf      , 128)) { return true; }
+  if (HdmiCecReadBuffer(HDMI_EDID_ADDRESS, 128, buf + 128, 128)) { return true; }
 
   // verify checksum for block 0
   uint8_t chk0 = 0;

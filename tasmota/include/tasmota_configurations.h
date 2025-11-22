@@ -1137,11 +1137,6 @@
   #define USE_TLS                                // flag indicates we need to include TLS code
 #endif                                           // USE_MQTT_TLS
 
-// HDMI CEC relies on I2C transactions even in pared-down firmware profiles.
-#if defined(USE_HDMI_CEC) && !defined(USE_I2C)
-  #define USE_I2C
-#endif
-
 /*********************************************************************************************\
  * Default image
 \*********************************************************************************************/
