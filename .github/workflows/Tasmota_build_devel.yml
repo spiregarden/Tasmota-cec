@@ -251,63 +251,25 @@ jobs:
           name: ${{ matrix.variant }}
           path: ./build_output
 
-  language-images:
-    needs: safeboot-images
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      matrix:
-        variant: [ tasmota, tasmota32 ]
-        language: [ AD, AF, BG, BR, CN, CZ, DE, ES, FR, FY, GR, HE, HU, IT, KO, LT, NL, PL, PT, RO, RU, SE, SK, TR, TW, UK, VN ]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: development
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          version: "latest"
-          enable-cache: false
-      - name: Install dependencies
-        run: |
-          uv pip install --system platformio
-          if [ ! -f ./platformio_override.ini ]; then cp ./platformio_override_sample.ini ./platformio_override.ini; fi
-      - name: Download safeboot firmwares
-        uses: actions/download-artifact@v4
-        with:
-          pattern: tasmota32*
-          path: ./temp
-      - name: Move safeboot files
-        run: |
-          mkdir -p ./firmware/firmware
-          find ./temp -type f -exec cp -t ./firmware/firmware {} +
-      - name: Add SHA to footer
-        run: |
-          COMMIT_SHA_LONG=$(git rev-parse --short HEAD || echo "")
-          SHA=${COMMIT_SHA_LONG::7}
-          sed -i -e "s/TASMOTA_SHA_SHORT/TASMOTA_SHA_SHORT $SHA-/g" ./tasmota/include/tasmota_version.h
-      - name: Run PlatformIO
-        env:
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: '1'
-        run: platformio run -e ${{ matrix.variant }}-${{ matrix.language }}
-      - name: Upload language firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.variant }}-${{ matrix.language }}
-          path: ./build_output
-
   Start_final_copy:
-    needs: [base-images, base32-images, language-images]
+    needs: [base-images, base32-images]
     runs-on: ubuntu-latest
+    if: ${{ secrets.API_TOKEN_GITHUB != '' }}
     steps:
     - name: Dispatch workflow in arendst/Tasmota-firmware
+      env:
+        TARGET_TOKEN: ${{ secrets.API_TOKEN_GITHUB }}
       run: |
          curl -X POST https://api.github.com/repos/arendst/Tasmota-firmware/actions/workflows/fetch_deploy.yml/dispatches \
          -H 'Accept: application/vnd.github.everest-preview+json' \
-         -u ${{ secrets.API_TOKEN_GITHUB }} \
+         -H "Authorization: Bearer ${TARGET_TOKEN}" \
          --data '{"ref": "gh_actions"}'
+
+  Start_final_copy_skip_notice:
+    needs: [base-images, base32-images]
+    runs-on: ubuntu-latest
+    if: ${{ secrets.API_TOKEN_GITHUB == '' }}
+    steps:
+      - name: Skip final copy
+        run: |
+          echo "Skipping deploy trigger because secrets.API_TOKEN_GITHUB is not configured."

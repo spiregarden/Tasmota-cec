@@ -8,12 +8,12 @@
 #ifndef _USER_CONFIG_OVERRIDE_H_
 #define _USER_CONFIG_OVERRIDE_H_
 
-// Enable HDMI-CEC feature
-#define USE_HDMI_CEC               // Enable HDMI CEC bridge support
-
-// Ensure I2C is enabled if it has not already been enabled
-#ifndef USE_I2C
-  #define USE_I2C                  // Required by some HDMI-CEC or related peripherals
+// HDMI-CEC can be turned on per-environment via build flags (see platformio_* configs).
+// When it is enabled we still need I2C support to access the DDC channel.
+#ifdef USE_HDMI_CEC
+  #ifndef USE_I2C
+    #define USE_I2C                // Required by HDMI-CEC for EDID reads
+  #endif
 #endif
 
 // Optional: keep build minimal (no displays or extras beyond HDMI_CEC + I2C)
