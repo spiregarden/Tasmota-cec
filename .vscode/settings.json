@@ -71,5 +71,7 @@
         "commands": "platformio-ide.rebuildProjectIndex"
       }
     ],
-    "C_Cpp.dimInactiveRegions": false
+    "C_Cpp.dimInactiveRegions": false,
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
   }
