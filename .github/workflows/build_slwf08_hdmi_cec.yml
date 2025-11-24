@@ -1,0 +1,120 @@
+name: Build SLWF-08 HDMI-CEC Firmware
+
+# This workflow builds a flashable ESP8266 firmware for the SLWF-08 module
+# with HDMI-CEC support enabled.
+#
+# To use this workflow:
+# 1. Go to the Actions tab in GitHub
+# 2. Select "Build SLWF-08 HDMI-CEC Firmware" from the workflows list
+# 3. Click "Run workflow" button
+# 4. Select the "development" branch
+# 5. Click "Run workflow"
+#
+# After completion, download the artifact named "slwf-08-hdmi-cec-firmware"
+# which contains the flashable .bin file.
+
+on:
+  workflow_dispatch:
+    branches:
+      - development
+  push:
+    branches:
+      - development
+    paths:
+      - 'user_config_override.h'
+      - 'tasmota/include/tasmota_template.h'
+      - 'tasmota/include/tasmota_template_legacy.h'
+      - '.github/workflows/build_slwf08_hdmi_cec.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-slwf08:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv (fast Python package installer)
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO
+        run: |
+          uv pip install --system platformio
+
+      - name: Verify user_config_override.h exists
+        run: |
+          if [ ! -f user_config_override.h ]; then
+            echo "ERROR: user_config_override.h not found!"
+            exit 1
+          fi
+          echo "user_config_override.h found, checking contents..."
+          grep -q "USE_HDMI_CEC" user_config_override.h || { echo "ERROR: USE_HDMI_CEC not defined!"; exit 1; }
+          echo "✓ HDMI-CEC configuration verified"
+
+      - name: Build firmware with PlatformIO
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: '1'
+        run: |
+          echo "Building tasmota environment (standard ESP8266)"
+          platformio run -e tasmota
+
+      - name: Verify firmware was built
+        run: |
+          if [ ! -f .pio/build/tasmota/firmware.bin ]; then
+            echo "ERROR: firmware.bin not found in .pio/build/tasmota/"
+            exit 1
+          fi
+          ls -lh .pio/build/tasmota/firmware.bin
+          echo "✓ Firmware built successfully"
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p firmware-output
+          cp .pio/build/tasmota/firmware.bin firmware-output/tasmota-slwf08-hdmi-cec.bin
+          echo "Build date: $(date)" > firmware-output/BUILD_INFO.txt
+          echo "Git commit: $(git rev-parse --short HEAD)" >> firmware-output/BUILD_INFO.txt
+          echo "Environment: tasmota (ESP8266)" >> firmware-output/BUILD_INFO.txt
+          echo "Features: HDMI-CEC, I2C, WS2812" >> firmware-output/BUILD_INFO.txt
+          echo "" >> firmware-output/BUILD_INFO.txt
+          echo "GPIO Configuration for SLWF-08:" >> firmware-output/BUILD_INFO.txt
+          echo "  GPIO12 = WS2812 LED" >> firmware-output/BUILD_INFO.txt
+          echo "  GPIO14 = HDMI CEC" >> firmware-output/BUILD_INFO.txt
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slwf-08-hdmi-cec-firmware
+          path: firmware-output/
+          retention-days: 90
+
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ SLWF-08 HDMI-CEC firmware built successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name:** slwf-08-hdmi-cec-firmware" >> $GITHUB_STEP_SUMMARY
+          echo "- **Firmware File:** tasmota-slwf08-hdmi-cec.bin" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Environment:** tasmota (ESP8266)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Features Enabled:** HDMI-CEC, I2C, WS2812" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### GPIO Mapping" >> $GITHUB_STEP_SUMMARY
+          echo "- GPIO12: WS2812 LED" >> $GITHUB_STEP_SUMMARY
+          echo "- GPIO14: HDMI CEC" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### How to Flash" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the artifact from the workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "2. Extract tasmota-slwf08-hdmi-cec.bin" >> $GITHUB_STEP_SUMMARY
+          echo "3. Use esptool.py or Tasmota Web Installer to flash" >> $GITHUB_STEP_SUMMARY
